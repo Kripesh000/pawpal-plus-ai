@@ -1,0 +1,43 @@
+flowchart TD
+    subgraph SRC["Input (capture-source agnostic)"]
+        A1["File upload / smartphone / litter box / monitoring station"] --> A2["ImageInput: bytes + name + source_type<br/>+ pet + optional symptoms"]
+    end
+
+    A2 --> B["ImageProcessor<br/>decode, format / size / corruption checks,<br/>RGBA + EXIF handling"]
+    B -- "unreadable / unsupported / too small" --> R1["REJECTED_INPUT<br/>no observations, escalation = inconclusive"]
+    B --> C["ImageQualityValidator + subject segmentation<br/>brightness, focus, blank frame, stool-like subject"]
+    C -- "dark / blurry / blank / no stool-coloured subject" --> R2["REJECTED_QUALITY<br/>retake advice, no observations"]
+
+    C --> D["StoolAnalyzer + HeuristicVisionBackend<br/>colour, shape, texture, flags:<br/>red, dark, pale, yellow, mucus-like, foreign"]
+    D --> E["FecalScoringEngine<br/>dog: Purina 1-7 estimate<br/>cat: descriptive category only"]
+    E --> F["ReliabilityEvaluator<br/>stability under 4 perturbations,<br/>blended confidence + caveats"]
+
+    KB[("Knowledge base<br/>7 sourced notes")] --> G["KnowledgeBase BM25 retrieval<br/>citations per topic"]
+    D --> G
+    E --> G
+
+    LLM["Optional LLMVisionBackend<br/>structured prompt + few-shot"] -. "only if API key set" .-> V1["validate_llm_payload<br/>schema + safety filter"]
+    G --> LLM
+    V1 -.-> F
+
+    F --> H["PetHistoryManager.compare<br/>Pet.stool_records: trend, repeats, duplicates"]
+    PT[("Pet.tasks<br/>Feeding + Medication")] --> I["DietCorrelationEngine<br/>possible context, never causation"]
+    H --> J["HealthInsightGenerator<br/>hedged associations + next steps"]
+    I --> J
+    G --> J
+    J --> K["VeterinaryEscalationEngine<br/>rule-based: none / monitor /<br/>contact vet soon / urgent"]
+    H --> K
+    V1 -.-> K
+
+    K --> L["AIResponseValidator.enforce<br/>structure checks, medical-safety filter,<br/>mandatory disclaimers"]
+    L --> M["AnalysisReport<br/>8 outputs + references + execution trace"]
+    M --> N["Output: CLI report / JSON / Streamlit tab"]
+    M -- "validated and not a duplicate" --> P["Persist to Pet.stool_records<br/>then JsonPersistence"]
+    N -. "opt-in" .-> S["schedule_vet_followup<br/>Scheduler.find_next_available_slot<br/>adds High-priority Vet task"]
+
+    classDef reject fill:#fde2e2,stroke:#c0392b
+    classDef guard fill:#fff4d6,stroke:#b9770e
+    classDef store fill:#e3f0ff,stroke:#2e6da4
+    class R1,R2 reject
+    class C,B,L,V1 guard
+    class KB,PT,P store
