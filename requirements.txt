@@ -1,0 +1,8 @@
+streamlit>=1.30
+pytest>=7.0
+tabulate>=0.9
+wcwidth>=0.2
+Pillow>=10.0
+numpy>=1.24
+# Optional: only needed for the multimodal second opinion (--llm). Everything else runs without it.
+# anthropic>=0.40
